@@ -17,8 +17,9 @@ ALERT_SENSOR_MSG = 'WARNING! dxPump is probably out of order...'
 # Time intervals
 DIAG_SENDING_INTERVAL = 30  # sec
 DATA_SENDING_INTERVAL = 300  # sec
-MIN_SEND_INTERVAL = 0.5  #
 DEBUG_LOG_INTERVAL = 1 # sec
+
+MIN_SEND_INTERVAL = 0.5  #
 POLL_INTERVAL = 0.2  # 200 ms
 
 # Pump 
@@ -27,9 +28,9 @@ STOP_PUMP = 0
 START_PUMP = 1
 
 # Distance from crsr04 sensor to a water level
-MIN_DISTANCE = 4  # cm
-MAX_DISTANCE = 9  # cm
-DISTANCE_DELTA = 0.5 # cm
+MIN_DISTANCE = 3  # cm
+MAX_DISTANCE = 8  # cm
+DISTANCE_DELTA = 0.25 # cm
 
 log_info("Initialize GPIO mode")
 GPIO.setmode(GPIO.BCM)
@@ -108,17 +109,16 @@ def main():
 
     data_timer = 0
     diag_timer = 0
+    log_timer = 0
 
     try:
         log_debug('Start reading distance...')
-        next_log_time = 0
-
         while True:
             distance = read_sensor_in_background()
+            global disableAlerts
 
             if distance is None:
                 log_error('Distance error!')
-                global disableAlerts
                 if not disableAlerts:
                     notify_all(ALERT_SENSOR_MSG)
                     send(cloud, variables, distance, True)
@@ -127,11 +127,11 @@ def main():
                 continue;    
 
             now = time()
-            should_log = now - next_log_time > DEBUG_LOG_INTERVAL
+            should_log = now - log_timer > DEBUG_LOG_INTERVAL
             if should_log:
                 log_debug("Distance = %.2f (cm)" % (distance))
                 #log_debug(readings.get_all())
-                next_log_time = now
+                log_timer = now
 
             global pump_on
             if distance < MIN_DISTANCE:  # Stop pouring
@@ -158,29 +158,24 @@ def main():
                 send(cloud, variables, distance)
                 prev_distance = distance
 
-            if data_timer <= 0:  # Regular 
+            if now - data_timer > DATA_SENDING_INTERVAL:
                 send(cloud, variables, distance)
-                data_timer = DATA_SENDING_INTERVAL
+                data_timer = now
 
-
-            if diag_timer <= 0:
+            if now - diag_timer > DIAG_SENDING_INTERVAL:
                 cloud.publish_diag()
                 #send(cloud, variables, distance)
-                diag_timer = DIAG_SENDING_INTERVAL
-
-            sleep(POLL_INTERVAL)
-
-            diag_timer -= POLL_INTERVAL
-            data_timer -= POLL_INTERVAL
-
+                diag_timer = now
+            
             disableAlerts = False
+            
+            sleep(POLL_INTERVAL)
 
     except Exception as e:
         log_error('FAILED:', e)
         traceback.print_exc()
 
     finally:
-        traceback.print_exc()
         GPIO.cleanup()
         sys.exit(0)
 

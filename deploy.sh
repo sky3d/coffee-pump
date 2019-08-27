@@ -1,4 +1,4 @@
-rsync -av --exclude .git coffee-pump sensor-setup *.sh pi@10.10.113.148:~/
+rsync -av coffee-pump sensor-setup *.sh pi@10.10.113.148:~/
 
 
 
