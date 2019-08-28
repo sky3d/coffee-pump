@@ -13,7 +13,7 @@ logger.addHandler(StreamHandler())
 log_file = RotatingFileHandler(
     log_name,
     maxBytes=1024 * 1024,
-    backupCount=10
+    backupCount=3
 )
 log_file.setFormatter(Formatter('%(asctime)s: %(message)s'))
 logger.addHandler(log_file)

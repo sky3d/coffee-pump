@@ -17,15 +17,15 @@ ALERT_SENSOR_MSG = 'WARNING! dxPump is probably out of order...'
 # Time intervals
 DIAG_SENDING_INTERVAL = 30  # sec
 DATA_SENDING_INTERVAL = 300  # sec
-DEBUG_LOG_INTERVAL = 1 # sec
+DEBUG_LOG_INTERVAL = 10 # sec
 
 MIN_SEND_INTERVAL = 0.5  #
-POLL_INTERVAL = 0.2  # 200 ms
+POLL_INTERVAL = 0.1  # 200 ms
 
 # Pump 
 PUMP_PIN = 4  # 7
-STOP_PUMP = 0
 START_PUMP = 1
+STOP_PUMP = 0
 
 # Distance from crsr04 sensor to a water level
 MIN_DISTANCE = 3  # cm
@@ -42,7 +42,14 @@ disableAlerts = False
 
 
 def get_uptime():
-    return '%.2f' % monotonic()
+    secs = monotonic()
+    mins = secs // 60
+    hours = mins // 60
+    days = hours // 24
+    secs -= mins * 60
+    mins -= hours * 60
+    hours -= days * 24
+    return '{0:.0f} days {1:.0f}:{2:.0f}:{3:.0f}'.format(days, hours,mins, secs)
 
 
 def water_level_changed(current):
@@ -56,17 +63,23 @@ def calc_water_level_percent(dist):
     return max(0, round(value))
 
 
-def toggle_pump(value, log):
-    if log:
-        log_debug("[x] %s" % ('START' if value else 'STOP'))
+def is_pump_on():
     global pump_on
-    pump_on = value
+    return pump_on
+
+
+def toggle_pump(value):
+    if value != is_pump_on():
+        log_debug("[x] %s" % ('START' if value else 'STOP'))
+
     GPIO.setup(PUMP_PIN, GPIO.OUT)
-    GPIO.output(PUMP_PIN, pump_on)  # Start/Stop pouring
+    GPIO.output(PUMP_PIN, value)  # Start/Stop pouring    
+    global pump_on
+    pump_on = GPIO.input(PUMP_PIN)
 
 
 def send(cloud, variables, dist, error=False):
-    global pump_on
+    pump_on = is_pump_on()
     percent = calc_water_level_percent(dist)
     variables['Distance']['value'] = dist
     variables['WaterLevel']['value'] = percent
@@ -79,7 +92,6 @@ def send(cloud, variables, dist, error=False):
         readings = cloud.read_data()
         cloud.publish_data(readings)
         last_sending_time = current
-
 
 def main():
     variables = {
@@ -129,15 +141,14 @@ def main():
             now = time()
             should_log = now - log_timer > DEBUG_LOG_INTERVAL
             if should_log:
-                log_debug("Distance = %.2f (cm)" % (distance))
+                #log_debug("Distance = %.2f (cm)" % (distance))
                 #log_debug(readings.get_all())
                 log_timer = now
 
-            global pump_on
+            global pump_on 
             if distance < MIN_DISTANCE:  # Stop pouring
                 prev_pump_on = pump_on
-                toggle_pump(STOP_PUMP, should_log)
-
+                toggle_pump(STOP_PUMP)
                 if (pump_on != prev_pump_on):
                     send(cloud, variables, distance)
 
@@ -147,8 +158,7 @@ def main():
 
             if distance > MAX_DISTANCE: # Start pouring
                 prev_pump_on = pump_on
-                toggle_pump(START_PUMP, should_log)
-
+                toggle_pump(START_PUMP)
                 if (pump_on != prev_pump_on):
                     send(cloud, variables, distance)
 
@@ -164,7 +174,6 @@ def main():
 
             if now - diag_timer > DIAG_SENDING_INTERVAL:
                 cloud.publish_diag()
-                #send(cloud, variables, distance)
                 diag_timer = now
             
             disableAlerts = False
