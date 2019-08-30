@@ -3,7 +3,7 @@ from hcsr04sensor import sensor
 from logger import log_debug, log_error, log_info
 from bounce_filter import BounceFilter
 
-MAX_READING_TIMEOUT = 1
+MAX_READING_TIMEOUT = 0.7
 
 # GPIO Pins
 TRIGGER_PIN = 17  #
@@ -17,7 +17,7 @@ readings = BounceFilter(size=6, discard_count=1)
 
 reading_complete = threading.Event()
 
-def read_sensor_in_background():
+def wait_for_distance():
     reading_complete.clear()
     thread = threading.Thread(target=read_distance)
     thread.start()

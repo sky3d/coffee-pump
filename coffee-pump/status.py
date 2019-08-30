@@ -11,4 +11,3 @@ def calc_status(error, percent, pump_on):
         else STATUS_MSG_OVERFLOW if percent > (100 + WATER_LEVEL_OVERFLOW_GAP) \
         else STATUS_MSG_POURING if pump_on \
         else STATUS_MSG_OK
-
