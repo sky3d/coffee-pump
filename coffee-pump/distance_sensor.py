@@ -2,15 +2,12 @@ import threading
 from hcsr04sensor import sensor
 from logger import log_debug, log_error, log_info
 from bounce_filter import BounceFilter
+from config import GPIO_TRIGGER, GPIO_ECHO
 
 MAX_READING_TIMEOUT = 0.7
 
-# GPIO Pins
-TRIGGER_PIN = 17  #
-ECHO_PIN = 27  # 13
-
 log_info('Connecting HCSR04 sensor...')
-hcsr04 = sensor.Measurement(trig_pin=TRIGGER_PIN, echo_pin=ECHO_PIN) 
+hcsr04 = sensor.Measurement(trig_pin=GPIO_TRIGGER, echo_pin=GPIO_ECHO) 
 
 # Keeps the last sensor measurements
 readings = BounceFilter(size=6, discard_count=1)

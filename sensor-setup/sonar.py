@@ -4,7 +4,7 @@ import time
  
 #GPIO Mode (BOARD / BCM)
 GPIO.setmode(GPIO.BCM)
- 
+
 #set GPIO Pins
 GPIO_TRIGGER = 17
 GPIO_ECHO = 27

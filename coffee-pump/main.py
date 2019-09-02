@@ -8,15 +8,14 @@ except RuntimeError:
     print("Error importing RPi.GPIO!  This is probably because you need superuser privileges.  You can achieve this by using 'sudo' to run your script")
 import cloud4rpi
 
+from config import C4R_TOKEN, C4R_HOST
+from config import GPIO_PUMP
+from config import MIN_DISTANCE, MAX_DISTANCE, DISTANCE_DELTA
 import rpi
 from distance_sensor import wait_for_distance
 from status import calc_status
 from logger import log_debug, log_error, log_info
 from notifications import notify_all
-
-C4R_TOKEN = '__PUT_YOUR_DEVICE_TOKEN_HERE__'
-
-ALERT_SENSOR_MSG = 'WARNING! dxPump is probably out of order...'
 
 # Time intervals
 DIAG_SENDING_INTERVAL = 60  # sec
@@ -27,56 +26,41 @@ MIN_SEND_INTERVAL = 0.5  #
 POLL_INTERVAL = 0.1  # 200 ms
 
 # Pump 
-PUMP_PIN = 4  # 7
 START_PUMP = 1
 STOP_PUMP = 0
-PUMP_BOUNCE_TIME = 200 # milliseconds
+PUMP_BOUNCE_TIME = 50 # milliseconds
 
-# Distance from the sensor to the water level
-MIN_DISTANCE = 3  # cm
-MAX_DISTANCE = 8  # cm
-DISTANCE_DELTA = 0.4 # cm
+ALERT_SENSOR_MSG = 'WARNING! dxPump is probably out of order...'
 
-prev_distance = -999999
+prev_distance = -9999
 last_sending_time = -1
 disableAlerts = False
 pump_on = False
-
-def pump_relay_handle(pin):
-    global pump_on
-    prev_pump_on = pump_on
-    GPIO.setup(PUMP_PIN, GPIO.IN)
-    pump_on = GPIO.input(PUMP_PIN)
-    if prev_pump_on != pump_on:
-        log_debug("[x] %s on distance  %.2f" % ('START' if pump_on else 'STOP', prev_distance))
-
-
-log_info("Setup GPIO...")
-GPIO.setmode(GPIO.BCM)
-
-GPIO.setup(PUMP_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-GPIO.add_event_detect(PUMP_PIN, GPIO.BOTH, callback=pump_relay_handle, bouncetime=PUMP_BOUNCE_TIME) 
-
 
 def water_level_changed(current):
     global prev_distance
     return abs(prev_distance - current) > DISTANCE_DELTA
 
 
-def calc_water_level_percent(distance):
-    current = distance if distance else 0
-    value = (MAX_DISTANCE - current) / (MAX_DISTANCE - MIN_DISTANCE) * 100
+def calc_water_level_percent(distance = 0):
+    value = (MAX_DISTANCE - distance) / (MAX_DISTANCE - MIN_DISTANCE) * 100
     return max(0, round(value))
 
 
 def is_pump_on():
     global pump_on
     return pump_on
-   
+
+def pump_relay_handle(pin):
+    global pump_on
+    pump_on = GPIO.input(GPIO_PUMP)
+    log_debug("Pump relay changed to %d" % pump_on)
+
 
 def toggle_pump(value):
-    GPIO.setup(PUMP_PIN, GPIO.OUT)
-    GPIO.output(PUMP_PIN, value)  # Start/Stop pouring    
+    log_debug("[x] %s" % ('START' if value else 'STOP'))
+    GPIO.setup(GPIO_PUMP, GPIO.OUT)
+    GPIO.output(GPIO_PUMP, value)  # Start/Stop pouring    
 
 
 def send(cloud, variables, dist, error=False):
@@ -93,7 +77,6 @@ def send(cloud, variables, dist, error=False):
         readings = cloud.read_data()
         cloud.publish_data(readings)
         last_sending_time = current
-
 
 def main():
     variables = {
@@ -120,8 +103,7 @@ def main():
         'Uptime': rpi.uptime_human
     }
 
-    cloud = cloud4rpi.connect(C4R_TOKEN, 'mq.stage.cloud4rpi.io')
-    #cloud = cloud4rpi.connect(C4R_TOKEN, '10.10.110.2')
+    cloud = cloud4rpi.connect(C4R_TOKEN, C4R_HOST)
     cloud.declare(variables)
     cloud.declare_diag(diagnostics)
     cloud.publish_config()
@@ -130,13 +112,18 @@ def main():
     diag_timer = 0
     log_timer = 0
 
+    log_info("Setup GPIO...")
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(GPIO_PUMP, GPIO.IN)
+    GPIO.add_event_detect(GPIO_PUMP, GPIO.BOTH, callback=pump_relay_handle, bouncetime=PUMP_BOUNCE_TIME) 
+    toggle_pump(STOP_PUMP)
+
     try:
         log_debug('Start...')
         while True:
-            global disableAlerts
-            global prev_distance
+            global disableAlerts, prev_distance
 
-            distance = wait_for_distance()            
+            distance = wait_for_distance()
             if distance is None:
                 log_error('Distance error!')
                 if not disableAlerts:
@@ -148,21 +135,20 @@ def main():
                     log_error('[!] Emergency stop of the pump. No signal from a distance sensor')
                     toggle_pump(STOP_PUMP)
 
-                continue    # TODO hanle case when pump is ON
+                continue
 
             now = time()
             should_log = now - log_timer > DEBUG_LOG_INTERVAL
             if should_log:
-                #log_debug("Distance = %.2f (cm)" % (distance))
-                #log_debug(readings.get_all())
+                log_debug("Distance = %.2f (cm)" % (distance))
                 log_timer = now
 
             if distance < MIN_DISTANCE:  # Stop pouring
                 toggle_pump(STOP_PUMP)
 
-            if GPIO.event_detected(PUMP_PIN):
+            if GPIO.event_detected(GPIO_PUMP):
                 edge = 'On' if is_pump_on() else 'Off'
-                log_debug('[+] Event Detected:  %s' % edge)
+                log_debug('[!] Event Detected:  %s' % edge)
                 send(cloud, variables, distance)
 
             if distance > MAX_DISTANCE * 2:  # Distance is out of expected range: do not start pouring
@@ -190,12 +176,12 @@ def main():
             sleep(POLL_INTERVAL)
 
     except Exception as e:
-        log_error('FAILED:', e)
+        log_error('ERROR: %s' % e)
         traceback.print_exc()
 
     finally:
         log_debug('Stopped!')
-        GPIO.remove_event_detect(PUMP_PIN)
+        GPIO.remove_event_detect(GPIO_PUMP)
         GPIO.cleanup()
         sys.exit(0)
 
