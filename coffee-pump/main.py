@@ -58,7 +58,8 @@ def pump_relay_handle(pin):
 
 
 def toggle_pump(value):
-    log_debug("[x] %s" % ('START' if value else 'STOP'))
+    if is_pump_on() != value:
+        log_debug("[x] %s" % ('START' if value else 'STOP'))
     GPIO.setup(GPIO_PUMP, GPIO.OUT)
     GPIO.output(GPIO_PUMP, value)  # Start/Stop pouring    
 
@@ -140,7 +141,7 @@ def main():
             now = time()
             should_log = now - log_timer > DEBUG_LOG_INTERVAL
             if should_log:
-                log_debug("Distance = %.2f (cm)" % (distance))
+                #log_debug("Distance = %.2f (cm)" % (distance))
                 log_timer = now
 
             if distance < MIN_DISTANCE:  # Stop pouring
@@ -148,7 +149,7 @@ def main():
 
             if GPIO.event_detected(GPIO_PUMP):
                 edge = 'On' if is_pump_on() else 'Off'
-                log_debug('[!] Event cDetected:  %s' % edge)
+                log_debug('[!] Pump event detected:  %s' % edge)
                 send(cloud, variables, distance, error=False, force=True)
 
             if distance > MAX_DISTANCE * 2:  # Distance is out of expected range: do not start pouring
