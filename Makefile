@@ -1,13 +1,15 @@
 .PHONY: install run start stop status log deploy beta-deploy
 
-SCRIPT_FILE:= coffee-pump/main.py
+MAIN_FILE:= coffee-pump/main.py
+SERVICE_INSTALL_SCRIPT:= service_install.sh
 SERVICE_NAME:= coffee-pump.service
 
 install:
-	sudo service_install $(SCRIPT_FILE)
+	chmod +x $(SERVICE_INSTALL_SCRIPT)
+	sudo ./$(SERVICE_INSTALL_SCRIPT) $(MAIN_FILE)
 
 run:
-	sudo python3 $(SCRIPT_FILE)
+	sudo python3 $(MAIN_FILE)
 
 start:
 	sudo systemctl start $(SERVICE_NAME)
@@ -23,6 +25,3 @@ log:
 
 deploy:
 	rsync -av coffee-pump sensor-setup Makefile *.sh pi@10.10.113.148:~/
-
-# beta-deploy:
-# 	rsync -av coffee-pump sensor-setup Makefile *.sh pi@10.10.113.148:~/beta/
