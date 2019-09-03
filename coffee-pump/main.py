@@ -5,7 +5,7 @@ from time import sleep, time
 try:
     import RPi.GPIO as GPIO
 except RuntimeError:
-    print("Error importing RPi.GPIO!  This is probably because you need superuser privileges.  You can achieve this by using 'sudo' to run your script")
+    print("Error importing RPi.GPIO!  Use 'sudo' to run your script")
 import cloud4rpi
 
 from config import C4R_TOKEN, C4R_HOST
@@ -15,7 +15,7 @@ import rpi
 from distance_sensor import wait_for_distance
 from status import calc_status
 from logger import log_debug, log_error, log_info
-from notifications import notify_all
+from notifications import notify_in_background
 
 # Time intervals
 DIAG_SENDING_INTERVAL = 60  # secs
