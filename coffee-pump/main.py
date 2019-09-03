@@ -18,12 +18,12 @@ from logger import log_debug, log_error, log_info
 from notifications import notify_all
 
 # Time intervals
-DIAG_SENDING_INTERVAL = 60  # sec
-DATA_SENDING_INTERVAL = 300  # sec
-DEBUG_LOG_INTERVAL = 10 # sec
+DIAG_SENDING_INTERVAL = 60  # secs
+DATA_SENDING_INTERVAL = 300  # secs
+DEBUG_LOG_INTERVAL = 10 # secs
 
-MIN_SEND_INTERVAL = 0.5  #
-POLL_INTERVAL = 0.1  # 200 ms
+MIN_SEND_INTERVAL = 0.5  # secs
+POLL_INTERVAL = 0.1  # ms
 
 # Pump 
 START_PUMP = 1
@@ -63,7 +63,7 @@ def toggle_pump(value):
     GPIO.output(GPIO_PUMP, value)  # Start/Stop pouring    
 
 
-def send(cloud, variables, dist, error=False):
+def send(cloud, variables, dist, error=False, force=False):
     pump_on = is_pump_on()
     percent = calc_water_level_percent(dist)
     variables['Distance']['value'] = dist
@@ -73,7 +73,7 @@ def send(cloud, variables, dist, error=False):
 
     current = time()
     global last_sending_time
-    if current - last_sending_time > MIN_SEND_INTERVAL:
+    if force or current - last_sending_time > MIN_SEND_INTERVAL:
         readings = cloud.read_data()
         cloud.publish_data(readings)
         last_sending_time = current
@@ -128,7 +128,7 @@ def main():
                 log_error('Distance error!')
                 if not disableAlerts:
                     notify_all(ALERT_SENSOR_MSG)
-                    send(cloud, variables, distance, True)
+                    send(cloud, variables, distance, error=True, force=True)
                     disableAlerts = True
 
                 if is_pump_on() and prev_distance < MIN_DISTANCE + DISTANCE_DELTA:
@@ -148,8 +148,8 @@ def main():
 
             if GPIO.event_detected(GPIO_PUMP):
                 edge = 'On' if is_pump_on() else 'Off'
-                log_debug('[!] Event Detected:  %s' % edge)
-                send(cloud, variables, distance)
+                log_debug('[!] Event cDetected:  %s' % edge)
+                send(cloud, variables, distance, error=False, force=True)
 
             if distance > MAX_DISTANCE * 2:  # Distance is out of expected range: do not start pouring
                 log_error('Distance is out of range:  %.2f' % distance)
