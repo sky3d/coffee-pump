@@ -42,8 +42,9 @@ def water_level_changed(current):
     return abs(prev_distance - current) > DISTANCE_DELTA
 
 
-def calc_water_level_percent(distance = 0):
-    value = (MAX_DISTANCE - distance) / (MAX_DISTANCE - MIN_DISTANCE) * 100
+def calc_water_level_percent(distance):
+    d = distance if distance else 0
+    value = (MAX_DISTANCE - d) / (MAX_DISTANCE - MIN_DISTANCE) * 100
     return max(0, round(value))
 
 
