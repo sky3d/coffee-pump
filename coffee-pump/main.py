@@ -10,7 +10,7 @@ import cloud4rpi
 
 from config import C4R_TOKEN, C4R_HOST
 from config import GPIO_PUMP
-from config import MIN_DISTANCE, MAX_DISTANCE, DISTANCE_DELTA
+from config import MIN_DISTANCE, MAX_DISTANCE, STOP_PUMP_DISTANCE, DISTANCE_DELTA
 import rpi
 from distance_sensor import wait_for_distance
 from status import calc_status
@@ -133,7 +133,7 @@ def main():
                     send(cloud, variables, distance, error=True, force=True)
                     disableAlerts = True
 
-                if is_pump_on() and prev_distance < MIN_DISTANCE + DISTANCE_DELTA:
+                if is_pump_on() and prev_distance < STOP_PUMP_DISTANCE + DISTANCE_DELTA:
                     log_error('[!] Emergency stop of the pump. No signal from a distance sensor')
                     toggle_pump(STOP_PUMP)
 
@@ -145,7 +145,7 @@ def main():
                 #log_debug("Distance = %.2f (cm)" % (distance))
                 log_timer = now
 
-            if distance < MIN_DISTANCE:  # Stop pouring
+            if distance <= STOP_PUMP_DISTANCE:  # Stop pouring
                 toggle_pump(STOP_PUMP)
 
             if GPIO.event_detected(GPIO_PUMP):
