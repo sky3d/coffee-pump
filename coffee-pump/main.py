@@ -34,13 +34,10 @@ PUMP_STOP_TIMEOUT = 5 # sec
 
 prev_distance = -9999
 last_sending_time = -1
-disable_alerts = False
-pump_on = False
-
-# Pouring state
 emergy_stop_time = None
+pump_on = False
 pump_disabled = False
-
+disable_alerts = False
 
 def water_level_changed(prev, current):
     return abs(prev - current) > DISTANCE_DELTA
@@ -61,6 +58,9 @@ def is_pump_on():
     global pump_on
     return pump_on
 
+
+def is_pump_enabled(): 
+    return not pump_disabled
 
 def pump_relay_handle(pin):
     global pump_on
@@ -115,10 +115,11 @@ def main():
         },
         'WaterLevel': {
             'type': 'numeric',
-        },
+        }
     }
 
     diagnostics = {
+        'Pump_Enabled': is_pump_enabled,
         'IP_Address': rpi.ip_address,
         'Host': rpi.host_name,
         'CPU_Temp': rpi.cpu_temp,

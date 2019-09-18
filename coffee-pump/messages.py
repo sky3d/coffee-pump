@@ -11,7 +11,7 @@ def calc_status(error_code, percent, pump_on):
 
 def calc_alert(error_code):
     sensor_msg = 'WARNING! The sensor probably is out of order...'
-    no_water_msg ='ACTION REQUIRED! Water source is empty! Please restart device or fill the water tank manually'
+    no_water_msg ='ACTION REQUIRED! Replace a water bottle and enable the pump by adding water manually.'
     return sensor_msg if error_code == SENSOR_ERROR \
         else no_water_msg if error_code == NO_WATER_ERROR \
         else ''
