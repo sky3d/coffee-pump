@@ -30,17 +30,21 @@ POLL_INTERVAL = 0.1  # ms
 START_PUMP = 1
 STOP_PUMP = 0
 PUMP_BOUNCE_TIME = 50 # milliseconds
+PUMP_STOP_TIMEOUT = 5 # sec
 
 prev_distance = -9999
 last_sending_time = -1
-disableAlerts = False
+disable_alerts = False
 pump_on = False
 
 # Pouring state
-next_pump_off_time = None
+emergy_stop_time = None
+pump_disabled = False
+
 
 def water_level_changed(prev, current):
     return abs(prev - current) > DISTANCE_DELTA
+
 
 def update_distance(distance):
     global prev_distance
@@ -65,15 +69,21 @@ def pump_relay_handle(pin):
 
 
 def toggle_pump(value):
+    if pump_disabled:
+        return        
     if is_pump_on() != value:
         log_debug("[x] %s" % ('START' if value else 'STOP'))
     GPIO.setup(GPIO_PUMP, GPIO.OUT)
-    GPIO.output(GPIO_PUMP, value)  # Start/Stop pouring    
+    GPIO.output(GPIO_PUMP, value)  # Start/Stop pouring 
 
 
-def set_next_pump_stop_time(now, is_pouring):
-    global next_pump_off_time
-    next_pump_off_time = now + 5 if is_pouring else None
+def set_emergy_stop_time(now, is_pouring):
+    global emergy_stop_time
+    emergy_stop_time = now + PUMP_STOP_TIMEOUT if is_pouring else None
+
+
+def check_water_source_empty(now):
+    return emergy_stop_time and now > emergy_stop_time
 
 
 def send(cloud, variables, dist, error_code=0, force=False):
@@ -134,16 +144,16 @@ def main():
     try:
         log_debug('Start...')
         while True:
-            global disableAlerts
+            global disable_alerts
 
             distance = wait_for_distance() # Read the current water depth
 
             if distance is None:
                 log_error('Distance error!')
-                if not disableAlerts:
+                if not disable_alerts:
                     notify_in_background(calc_alert(SENSOR_ERROR))
                     send(cloud, variables, distance, error_code=SENSOR_ERROR, force=True)
-                    disableAlerts = True
+                    disable_alerts = True
 
                 if is_pump_on() and prev_distance < STOP_PUMP_DISTANCE + DISTANCE_DELTA:
                     log_error('[!] Emergency stop of the pump. No signal from a distance sensor')
@@ -162,17 +172,18 @@ def main():
            
             if GPIO.event_detected(GPIO_PUMP):                
                 is_pouring = is_pump_on()
-                set_next_pump_stop_time(now, is_pouring)
-
+                set_emergy_stop_time(now, is_pouring)
                 log_debug('[!] Pump event detected:  %s' % ('On' if is_pouring else 'Off'))
                 send(cloud, variables, distance, force=True)
 
-            if next_pump_off_time and now > next_pump_off_time:
-                log_error('[!] Emergency stop of the pump. Water source is empty')
+            global pump_disabled
+            if check_water_source_empty(now):
+                log_error('[!] Emergency stop of the pump. Water source is empty')                
                 toggle_pump(STOP_PUMP)
+                pump_disabled = True
+                
                 notify_in_background(calc_alert(NO_WATER_ERROR))
                 send(cloud, variables, distance, error_code=NO_WATER_ERROR, force=True)
-                continue
 
             if distance > MAX_DISTANCE * 2:  # Distance is out of expected range: do not start pouring
                 log_error('Distance is out of range:  %.2f' % distance)
@@ -184,8 +195,11 @@ def main():
             if water_level_changed(prev_distance, distance):
                 log_debug("Distance changed to %.2f (cm)" % (distance))
                 send(cloud, variables, distance)
+                
                 update_distance(distance)
-                set_next_pump_stop_time(now, is_pump_on())
+                set_emergy_stop_time(now, is_pump_on())
+                
+                pump_disabled = False # Allow to activate pump next time
 
             if now - data_timer > DATA_SENDING_INTERVAL:
                 send(cloud, variables, distance)
@@ -195,7 +209,7 @@ def main():
                 cloud.publish_diag()
                 diag_timer = now
             
-            disableAlerts = False
+            disable_alerts = False
             
             sleep(POLL_INTERVAL)
 
