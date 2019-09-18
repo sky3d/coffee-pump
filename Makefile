@@ -21,7 +21,7 @@ stop:
 	sudo systemctl stop $(SERVICE_NAME)
 
 log:
-	sudo journalctl -u coffee-pump
+	sudo journalctl -u coffee-pump --since today
 
 deploy:
 	rsync -av coffee-pump sensor-setup Makefile *.sh pi@10.10.113.148:~/
