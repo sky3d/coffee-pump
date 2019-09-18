@@ -1,4 +1,4 @@
-.PHONY: install run start stop status log deploy beta-deploy
+.PHONY: install run start stop status log deploy
 
 MAIN_FILE:= coffee-pump/main.py
 SERVICE_INSTALL_SCRIPT:= service_install.sh

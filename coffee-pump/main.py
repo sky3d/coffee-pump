@@ -32,23 +32,19 @@ STOP_PUMP = 0
 PUMP_BOUNCE_TIME = 50 # milliseconds
 
 prev_distance = -9999
-start_pouring_time = None
-start_pouring_distance = -9999
 last_sending_time = -1
 disableAlerts = False
 pump_on = False
 
-def water_level_changed(current):
+# Pouring state
+next_pump_off_time = None
+
+def water_level_changed(prev, current):
+    return abs(prev - current) > DISTANCE_DELTA
+
+def update_distance(distance):
     global prev_distance
-    return abs(prev_distance - current) > DISTANCE_DELTA
-
-
-def water_source_empty(now, distance):
-    global start_pouring_time, start_pouring_distance
-    if start_pouring_time and now - start_pouring_time > 3:   # Waits 3 sec after pouring start 
-        # Checks for water level changes since the start of pouring
-        return abs(start_pouring_distance - distance) < DISTANCE_DELTA 
-    return False        
+    prev_distance = distance
 
 
 def calc_water_level_percent(distance):
@@ -61,19 +57,23 @@ def is_pump_on():
     global pump_on
     return pump_on
 
+
 def pump_relay_handle(pin):
-    global pump_on, prev_distance, start_pouring_time, start_pouring_distance
+    global pump_on
     pump_on = GPIO.input(GPIO_PUMP)
     log_debug("Pump relay changed to %d" % pump_on)
 
-    start_pouring_time = time() if pump_on else None
-    start_pouring_distance = prev_distance if pump_on else -9999
 
 def toggle_pump(value):
     if is_pump_on() != value:
         log_debug("[x] %s" % ('START' if value else 'STOP'))
     GPIO.setup(GPIO_PUMP, GPIO.OUT)
     GPIO.output(GPIO_PUMP, value)  # Start/Stop pouring    
+
+
+def set_next_pump_stop_time(now, is_pouring):
+    global next_pump_off_time
+    next_pump_off_time = now + 5 if is_pouring else None
 
 
 def send(cloud, variables, dist, error_code=0, force=False):
@@ -134,7 +134,7 @@ def main():
     try:
         log_debug('Start...')
         while True:
-            global disableAlerts, prev_distance
+            global disableAlerts
 
             distance = wait_for_distance() # Read the current water depth
 
@@ -157,20 +157,22 @@ def main():
                 #log_debug("Distance = %.2f (cm)" % (distance))
                 log_timer = now
 
-            if water_source_empty(now, distance):
+            if distance <= STOP_PUMP_DISTANCE:  # Stop pouring
+                toggle_pump(STOP_PUMP)
+           
+            if GPIO.event_detected(GPIO_PUMP):                
+                is_pouring = is_pump_on()
+                set_next_pump_stop_time(now, is_pouring)
+
+                log_debug('[!] Pump event detected:  %s' % ('On' if is_pouring else 'Off'))
+                send(cloud, variables, distance, force=True)
+
+            if next_pump_off_time and now > next_pump_off_time:
                 log_error('[!] Emergency stop of the pump. Water source is empty')
                 toggle_pump(STOP_PUMP)
                 notify_in_background(calc_alert(NO_WATER_ERROR))
                 send(cloud, variables, distance, error_code=NO_WATER_ERROR, force=True)
                 continue
-
-            if distance <= STOP_PUMP_DISTANCE:  # Stop pouring
-                toggle_pump(STOP_PUMP)
-
-            if GPIO.event_detected(GPIO_PUMP):
-                edge = 'On' if is_pump_on() else 'Off'
-                log_debug('[!] Pump event detected:  %s' % edge)
-                send(cloud, variables, distance, force=True)
 
             if distance > MAX_DISTANCE * 2:  # Distance is out of expected range: do not start pouring
                 log_error('Distance is out of range:  %.2f' % distance)
@@ -179,10 +181,11 @@ def main():
             if distance > MAX_DISTANCE: # Start pouring
                 toggle_pump(START_PUMP)
             
-            if water_level_changed(distance):
+            if water_level_changed(prev_distance, distance):
                 log_debug("Distance changed to %.2f (cm)" % (distance))
                 send(cloud, variables, distance)
-                prev_distance = distance
+                update_distance(distance)
+                set_next_pump_stop_time(now, is_pump_on())
 
             if now - data_timer > DATA_SENDING_INTERVAL:
                 send(cloud, variables, distance)
