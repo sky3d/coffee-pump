@@ -1,6 +1,6 @@
 # coffee-pump
 
-####Automatic coffee machine water pump
+#### Automatic water pump for a coffee machine using the HC-SR04 sensor, Raspberry Pi and Cloud4RPi.
 
 
 1. Install dependencies:
@@ -33,3 +33,6 @@
     ```bash
     make log
     ```
+
+Demo Video: https://youtu.be/JSZgaPKaC8s
+
