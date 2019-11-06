@@ -20,8 +20,8 @@ from notifications import notify_in_background
 
 # Time intervals
 DIAG_SENDING_INTERVAL = 60  # secs
-DATA_SENDING_INTERVAL = 300  # secs
-DEBUG_LOG_INTERVAL = 10 # secs
+DATA_SENDING_INTERVAL = 300 # secs
+DEBUG_LOG_INTERVAL = 10     # secs
 
 MIN_SEND_INTERVAL = 0.5  # secs
 POLL_INTERVAL = 0.1  # ms
@@ -29,15 +29,16 @@ POLL_INTERVAL = 0.1  # ms
 # Pump 
 START_PUMP = 1
 STOP_PUMP = 0
-PUMP_BOUNCE_TIME = 50 # milliseconds
-PUMP_STOP_TIMEOUT = 5 # sec
+PUMP_BOUNCE_TIME = 50   # milliseconds
+PUMP_STOP_TIMEOUT = 5   # secs
 
 prev_distance = -9999
 last_sending_time = -1
-emergy_stop_time = None
+emergency_stop_time = None
 pump_on = False
 pump_disabled = False
 disable_alerts = False
+
 
 def water_level_changed(prev, current):
     return abs(prev - current) > DISTANCE_DELTA
@@ -62,6 +63,7 @@ def is_pump_on():
 def is_pump_enabled(): 
     return not pump_disabled
 
+
 def pump_relay_handle(pin):
     global pump_on
     pump_on = GPIO.input(GPIO_PUMP)
@@ -77,13 +79,13 @@ def toggle_pump(value):
     GPIO.output(GPIO_PUMP, value)  # Start/Stop pouring 
 
 
-def set_emergy_stop_time(now, is_pouring):
-    global emergy_stop_time
-    emergy_stop_time = now + PUMP_STOP_TIMEOUT if is_pouring else None
+def set_emergency_stop_time(now, is_pouring):
+    global emergency_stop_time
+    emergency_stop_time = now + PUMP_STOP_TIMEOUT if is_pouring else None
 
 
 def check_water_source_empty(now):
-    return emergy_stop_time and now > emergy_stop_time
+    return emergency_stop_time and now > emergency_stop_time
 
 
 def send(cloud, variables, dist, error_code=0, force=False):
@@ -173,7 +175,7 @@ def main():
            
             if GPIO.event_detected(GPIO_PUMP):                
                 is_pouring = is_pump_on()
-                set_emergy_stop_time(now, is_pouring)
+                set_emergency_stop_time(now, is_pouring)
                 log_debug('[!] Pump event detected:  %s' % ('On' if is_pouring else 'Off'))
                 send(cloud, variables, distance, force=True)
 
@@ -198,7 +200,7 @@ def main():
                 send(cloud, variables, distance)
                 
                 update_distance(distance)
-                set_emergy_stop_time(now, is_pump_on())
+                set_emergency_stop_time(now, is_pump_on())
                 
                 pump_disabled = False # Allow to activate pump next time
 
