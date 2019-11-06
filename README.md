@@ -1,7 +1,8 @@
-# coffee-pump
+# Smart Coffee Machine Pump using Raspberry Pi & Ultrasonic HC-SR04 sensor.
 
-#### Automatic water pump for a coffee machine using the HC-SR04 sensor, Raspberry Pi and Cloud4RPi.
+### Automatic water pump for a coffee machine using the HC-SR04 sensor, Raspberry Pi and Cloud4RPi.
 
+## How to use
 
 1. Install dependencies:
     ```sh
@@ -34,5 +35,10 @@
     make log
     ```
 
-Demo Video: https://youtu.be/JSZgaPKaC8s
+## Demo Video
 
+https://youtu.be/JSZgaPKaC8s
+
+## See Also
+
+[Cloud4RPi on GitHub](https://github.com/cloud4rpi)
